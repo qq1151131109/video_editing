@@ -160,5 +160,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "VideoCropNode": "视频裁切节点"
+    "VideoCropNode": "视频画面裁切"
 }
