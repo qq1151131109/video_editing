@@ -88,6 +88,7 @@ class VideoCropNode:
             
             # 遍历所有视频文件
             processed_count = 0
+            output_paths = []
             for ext in video_extensions:
                 pattern = os.path.join(input_folder_path, ext)
                 video_files = glob.glob(pattern)
@@ -139,6 +140,7 @@ class VideoCropNode:
                             )
                         
                         processed_count += 1
+                        output_paths.append(output_file)
                         audio_status = "保留音效" if (keep_audio and has_audio) else "无音效"
                         print(f"已处理: {video_file} -> {output_file} ({audio_status})")
                         
@@ -147,12 +149,17 @@ class VideoCropNode:
                         continue
             
             if processed_count == 0:
-                return (f"未找到可处理的视频文件",)
+                return ("",)  # 没有可处理的视频时返回空字符串
             else:
-                return (f"成功处理 {processed_count} 个视频文件，保存到: {output_path}",)
+                # 返回输出文件的目录路径
+                print(f"成功处理 {processed_count} 个视频文件")
+                print(f"输出目录: {output_path}")
+                print(f"输出文件: {output_paths}")
+                return (output_path,)
                 
         except Exception as e:
-            return (f"处理过程中出错: {str(e)}",)
+            print(f"处理过程中出错: {str(e)}")
+            return ("",)  # 出错时也返回空字符串
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
