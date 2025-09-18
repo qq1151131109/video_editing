@@ -642,13 +642,11 @@ class EnhancedVideoCropNode:
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
-    "VideoCropNode": VideoCropNode,
     "EnhancedVideoCropNode": EnhancedVideoCropNode
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "VideoCropNode": "视频画面裁切",
-    "EnhancedVideoCropNode": "智能视频裁切"
+    "EnhancedVideoCropNode": "批量视频画面裁切"
 }
 
 # Web目录配置
