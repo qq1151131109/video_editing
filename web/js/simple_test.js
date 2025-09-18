@@ -386,34 +386,36 @@ function createPreview(node) {
 
             if (event.type === "pointerdown") {
                 // 检查是否点击在控制点或红框内部
-                const handleSize = 8;
+                const handleDisplaySize = 8;  // 显示大小
+                const handleClickSize = 20;   // 点击区域大小（更大，更容易点击）
 
-                // 控制点在画布上的位置（使用已计算的cropX, cropY）
-                const topLeft = [cropX - handleSize/2, cropY - handleSize/2];
-                const topRight = [cropX + scaledCropWidth - handleSize/2, cropY - handleSize/2];
-                const bottomLeft = [cropX - handleSize/2, cropY + scaledCropHeight - handleSize/2];
-                const bottomRight = [cropX + scaledCropWidth - handleSize/2, cropY + scaledCropHeight - handleSize/2];
+                // 控制点的中心位置
+                const topLeftCenter = [cropX, cropY];
+                const topRightCenter = [cropX + scaledCropWidth, cropY];
+                const bottomLeftCenter = [cropX, cropY + scaledCropHeight];
+                const bottomRightCenter = [cropX + scaledCropWidth, cropY + scaledCropHeight];
 
-                console.log(`🎯 控制点位置: TL(${topLeft[0].toFixed(0)}, ${topLeft[1].toFixed(0)}) TR(${topRight[0].toFixed(0)}, ${topRight[1].toFixed(0)})`);
+                console.log(`🎯 控制点中心: TL(${topLeftCenter[0].toFixed(0)}, ${topLeftCenter[1].toFixed(0)}) TR(${topRightCenter[0].toFixed(0)}, ${topRightCenter[1].toFixed(0)})`);
 
                 // 重置状态
                 this.resizeHandle = null;
                 this.isDragging = false;
                 let isValidClick = false;
 
-                if (this.isPointInRect(pos, topLeft, handleSize)) {
+                // 检查是否点击在控制点的扩大区域内（以中心点为基准）
+                if (this.isPointInCircle(pos, topLeftCenter, handleClickSize/2)) {
                     this.resizeHandle = 'topLeft';
                     isValidClick = true;
                     console.log("🔍 点击左上角控制点");
-                } else if (this.isPointInRect(pos, topRight, handleSize)) {
+                } else if (this.isPointInCircle(pos, topRightCenter, handleClickSize/2)) {
                     this.resizeHandle = 'topRight';
                     isValidClick = true;
                     console.log("🔍 点击右上角控制点");
-                } else if (this.isPointInRect(pos, bottomLeft, handleSize)) {
+                } else if (this.isPointInCircle(pos, bottomLeftCenter, handleClickSize/2)) {
                     this.resizeHandle = 'bottomLeft';
                     isValidClick = true;
                     console.log("🔍 点击左下角控制点");
-                } else if (this.isPointInRect(pos, bottomRight, handleSize)) {
+                } else if (this.isPointInCircle(pos, bottomRightCenter, handleClickSize/2)) {
                     this.resizeHandle = 'bottomRight';
                     isValidClick = true;
                     console.log("🔍 点击右下角控制点");
@@ -533,6 +535,12 @@ function createPreview(node) {
         isPointInRect: function(point, rectPos, size) {
             return point[0] >= rectPos[0] && point[0] <= rectPos[0] + size &&
                    point[1] >= rectPos[1] && point[1] <= rectPos[1] + size;
+        },
+
+        isPointInCircle: function(point, center, radius) {
+            const dx = point[0] - center[0];
+            const dy = point[1] - center[1];
+            return (dx * dx + dy * dy) <= (radius * radius);
         },
 
         drawDefaultBackground: function(ctx, x, y, width, height, scale, node) {
