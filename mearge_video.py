@@ -37,7 +37,14 @@ class VideoMergeNode:
                 "material_folder": (cls.get_input_folders(), {"default": "input", "tooltip": "选择素材视频所在的文件夹"}),
                 "game_folder": (cls.get_input_folders(), {"default": "input", "tooltip": "选择游戏视频所在的文件夹"}),
                 "position": (["up", "down"], {"default": "up", "tooltip": "up: 素材视频在上方, down: 素材视频在下方"}),
+                "audio_mode": (["game_only", "mix"], {"default": "game_only", "tooltip": "game_only: 只使用游戏音频, mix: 素材和游戏音频混音"}),
+                "material_audio_volume": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 2.0, "step": 0.1, "tooltip": "素材音频音量占比 (0.0-2.0)"}),
+                "game_audio_volume": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 2.0, "step": 0.1, "tooltip": "游戏音频音量占比 (0.0-2.0)"}),
                 "output_folder_name": ("STRING", {"default": "merged_videos", "multiline": False, "tooltip": "输出文件夹名称，合并后的视频将保存到此文件夹"}),
+            },
+            "optional": {
+                "material_path": ("STRING", {"default": "", "multiline": False, "tooltip": "直接输入素材文件夹的完整路径，优先级高于下拉框选择"}),
+                "game_path": ("STRING", {"default": "", "multiline": False, "tooltip": "直接输入游戏文件夹的完整路径，优先级高于下拉框选择"}),
             }
         }
     
@@ -84,23 +91,45 @@ class VideoMergeNode:
             if new_height % 2 != 0:
                 new_height += 1
             
-            # 使用ffmpeg进行缩放
-            (
-                ffmpeg
-                .input(input_path)
-                .video
-                .filter('scale', target_width, new_height)
-                .output(output_path, vcodec='libx264', preset='medium')
-                .overwrite_output()
-                .run(quiet=True)
-            )
+            # 使用ffmpeg进行缩放，兼容有声音和没有声音的情况
+            input_stream = ffmpeg.input(input_path)
+            video_info = self.get_video_info(input_path)
+            
+            if video_info and video_info['has_audio']:
+                # 有音频的情况
+                (
+                    ffmpeg
+                    .output(
+                        input_stream.video.filter('scale', target_width, new_height),
+                        input_stream.audio,  # 保留音频
+                        output_path, 
+                        vcodec='libx264', 
+                        acodec='aac', 
+                        preset='medium'
+                    )
+                    .overwrite_output()
+                    .run(quiet=True)
+                )
+            else:
+                # 没有音频的情况
+                (
+                    ffmpeg
+                    .output(
+                        input_stream.video.filter('scale', target_width, new_height),
+                        output_path, 
+                        vcodec='libx264', 
+                        preset='medium'
+                    )
+                    .overwrite_output()
+                    .run(quiet=True)
+                )
             
             return True
         except Exception as e:
             print(f"视频缩放失败 {input_path}: {str(e)}")
             return False
     
-    def merge_videos_vertically(self, material_path, game_path, output_path, position="up"):
+    def merge_videos_vertically(self, material_path, game_path, output_path, position="up", audio_mode="game_only", material_audio_volume=0.5, game_audio_volume=0.5):
         """垂直合并视频"""
         try:
             # 根据位置确定视频顺序并合并
@@ -112,12 +141,27 @@ class VideoMergeNode:
                 # 使用vstack filter合并视频
                 video_output = ffmpeg.filter([material_input.video, game_input.video], 'vstack', inputs=2)
                 
-                # 输出合并后的视频，使用游戏的音效
+                # 根据音频模式处理音频
+                if audio_mode == "mix":
+                    # 混音模式：使用ffmpeg-python库处理音频放大
+                    # 对素材音频应用音量调整
+                    material_audio_adjusted = material_input.audio.filter('volume', material_audio_volume)
+                    # 对游戏音频应用音量调整
+                    game_audio_adjusted = game_input.audio.filter('volume', game_audio_volume)
+                    
+                    # 使用amix filter混合音频
+                    audio_output = ffmpeg.filter([material_audio_adjusted, game_audio_adjusted], 'amix', inputs=2, duration='longest')
+                    print("混音模式：成功创建混音")
+                else:
+                    # 只使用游戏音频
+                    audio_output = game_input.audio
+                
+                # 输出合并后的视频
                 (
                     ffmpeg
                     .output(
                         video_output,
-                        game_input.audio,
+                        audio_output,
                         output_path,
                         vcodec='libx264',
                         acodec='aac',
@@ -125,7 +169,7 @@ class VideoMergeNode:
                         preset='medium'
                     )
                     .overwrite_output()
-                    .run(quiet=True)
+                    .run(quiet=False)  # 显示详细错误信息
                 )
             else:
                 # 游戏在上，素材在下
@@ -135,12 +179,27 @@ class VideoMergeNode:
                 # 使用vstack filter合并视频
                 video_output = ffmpeg.filter([game_input.video, material_input.video], 'vstack', inputs=2)
                 
-                # 输出合并后的视频，使用游戏的音效
+                # 根据音频模式处理音频
+                if audio_mode == "mix":
+                    # 混音模式：使用ffmpeg-python库处理音频放大
+                    # 对素材音频应用音量调整
+                    material_audio_adjusted = material_input.audio.filter('volume', material_audio_volume)
+                    # 对游戏音频应用音量调整
+                    game_audio_adjusted = game_input.audio.filter('volume', game_audio_volume)
+                    
+                    # 使用amix filter混合音频
+                    audio_output = ffmpeg.filter([material_audio_adjusted, game_audio_adjusted], 'amix', inputs=2, duration='longest')
+                    print("混音模式：成功创建混音")
+                else:
+                    # 只使用游戏音频
+                    audio_output = game_input.audio
+                
+                # 输出合并后的视频
                 (
                     ffmpeg
                     .output(
                         video_output,
-                        game_input.audio,
+                        audio_output,
                         output_path,
                         vcodec='libx264',
                         acodec='aac',
@@ -148,7 +207,7 @@ class VideoMergeNode:
                         preset='medium'
                     )
                     .overwrite_output()
-                    .run(quiet=True)
+                    .run(quiet=False)  # 显示详细错误信息
                 )
             
             return True
@@ -157,37 +216,52 @@ class VideoMergeNode:
             print(f"视频合并失败: {str(e)}")
             return False
     
-    def merge_videos(self, material_folder, game_folder, position, output_folder_name):
+    def merge_videos(self, material_folder, game_folder, position, audio_mode, material_audio_volume, game_audio_volume, output_folder_name, material_path="", game_path=""):
         """
         合并视频文件
         
         Args:
-            material_folder: 素材文件夹
-            game_folder: 游戏视频文件夹
-            position: 位置关系（上/下）
+            material_folder: 素材文件夹（下拉框选择）
+            game_folder: 游戏视频文件夹（下拉框选择）
+            position: 位置关系（up/down）
+            audio_mode: 音频模式（game_only/mix）
+            material_audio_volume: 素材音频音量占比
+            game_audio_volume: 游戏音频音量占比
             output_folder_name: 输出文件夹名字
+            material_path: 直接输入的素材文件夹路径（可选，优先级高于下拉框）
+            game_path: 直接输入的游戏文件夹路径（可选，优先级高于下拉框）
         """
         try:
             # 使用ComfyUI的默认输入和输出路径
             base_input_dir = folder_paths.get_input_directory()
             output_folder = folder_paths.get_output_directory()
             
-            # 构建完整的输入路径
-            if material_folder == "input":
-                material_path = base_input_dir
+            # 构建完整的输入路径（直接输入的路径优先级更高）
+            if material_path and material_path.strip():
+                # 使用直接输入的素材路径
+                material_input_path = material_path.strip()
             else:
-                material_path = os.path.join(base_input_dir, material_folder)
+                # 使用下拉框选择的路径
+                if material_folder == "input":
+                    material_input_path = base_input_dir
+                else:
+                    material_input_path = os.path.join(base_input_dir, material_folder)
             
-            if game_folder == "input":
-                game_path = base_input_dir
+            if game_path and game_path.strip():
+                # 使用直接输入的游戏路径
+                game_input_path = game_path.strip()
             else:
-                game_path = os.path.join(base_input_dir, game_folder)
+                # 使用下拉框选择的路径
+                if game_folder == "input":
+                    game_input_path = base_input_dir
+                else:
+                    game_input_path = os.path.join(base_input_dir, game_folder)
             
             # 验证输入文件夹
-            if not os.path.exists(material_path):
-                raise ValueError(f"素材文件夹不存在: {material_path}")
-            if not os.path.exists(game_path):
-                raise ValueError(f"游戏视频文件夹不存在: {game_path}")
+            if not os.path.exists(material_input_path):
+                raise ValueError(f"素材文件夹不存在: {material_input_path}")
+            if not os.path.exists(game_input_path):
+                raise ValueError(f"游戏视频文件夹不存在: {game_input_path}")
             
             # 在输出目录下创建指定名字的文件夹
             output_path = os.path.join(output_folder, output_folder_name)
@@ -199,13 +273,13 @@ class VideoMergeNode:
             # 获取所有游戏视频文件
             game_videos = []
             for ext in video_extensions:
-                pattern = os.path.join(game_path, ext)
+                pattern = os.path.join(game_input_path, ext)
                 game_videos.extend(glob.glob(pattern))
             
             # 获取所有素材视频文件
             material_videos = []
             for ext in video_extensions:
-                pattern = os.path.join(material_path, ext)
+                pattern = os.path.join(material_input_path, ext)
                 material_videos.extend(glob.glob(pattern))
             
             if not game_videos:
@@ -228,6 +302,11 @@ class VideoMergeNode:
                     if not game_info:
                         continue
                     
+                    # 检查游戏视频音频情况
+                    game_filename = Path(game_video).stem
+                    if audio_mode == "mix" and not game_info['has_audio']:
+                        print(f"警告: 游戏视频 {game_filename} 没有音频，在mix模式下可能影响混音效果")
+                    
                     game_duration = game_info['duration']
                     used_materials = []
                     current_duration = 0
@@ -240,6 +319,11 @@ class VideoMergeNode:
                         if not material_info:
                             material_index += 1
                             continue
+                        
+                        # 检查素材视频音频情况
+                        material_filename = Path(material_video).stem
+                        if audio_mode == "mix" and not material_info['has_audio']:
+                            print(f"警告: 素材视频 {material_filename} 没有音频，在mix模式下可能影响混音效果")
                         
                         used_materials.append({
                             'path': material_video,
@@ -265,18 +349,56 @@ class VideoMergeNode:
                     game_info = self.get_video_info(game_video)
                     game_width = game_info['width']
                     
+                    # 在mix模式下进行最终的音频检查
+                    if audio_mode == "mix":
+                        # 检查所有使用的素材是否有音频
+                        materials_with_audio = [m for m in used_materials if m['info']['has_audio']]
+                        materials_without_audio = [m for m in used_materials if not m['info']['has_audio']]
+                        
+                        if not game_info['has_audio'] and not materials_with_audio:
+                            print(f"错误: 游戏视频 {game_filename} 和所有素材视频都没有音频，无法进行混音处理")
+                            continue
+                        elif not game_info['has_audio']:
+                            print(f"警告: 游戏视频 {game_filename} 没有音频，将只使用素材音频")
+                        elif not materials_with_audio:
+                            print(f"警告: 所有素材视频都没有音频，将只使用游戏音频")
+                        elif materials_without_audio:
+                            print(f"警告: {len(materials_without_audio)} 个素材视频没有音频，可能影响混音效果")
+                    
                     # 如果只有一个素材且长度足够，直接使用
                     if len(used_materials) == 1 and used_materials[0]['duration'] >= game_duration:
-                        # 先将素材宽度对齐到游戏宽度，然后截取到游戏长度
-                        (
-                            ffmpeg
-                            .input(used_materials[0]['path'], t=game_duration)
-                            .video
-                            .filter('scale', game_width, -1)  # 宽度对齐，高度自动计算
-                            .output(temp_material_path, vcodec='libx264', preset='medium')
-                            .overwrite_output()
-                            .run(quiet=True)
-                        )
+                        # 先将素材宽度对齐到游戏宽度，然后截取到游戏长度，兼容音频情况
+                        input_stream = ffmpeg.input(used_materials[0]['path'], t=game_duration)
+                        material_info = used_materials[0]['info']
+                        
+                        if material_info['has_audio']:
+                            # 有音频的情况
+                            (
+                                ffmpeg
+                                .output(
+                                    input_stream.video.filter('scale', game_width, -1),  # 宽度对齐，高度自动计算
+                                    input_stream.audio,  # 保留音频
+                                    temp_material_path, 
+                                    vcodec='libx264', 
+                                    acodec='aac', 
+                                    preset='medium'
+                                )
+                                .overwrite_output()
+                                .run(quiet=True)
+                            )
+                        else:
+                            # 没有音频的情况
+                            (
+                                ffmpeg
+                                .output(
+                                    input_stream.video.filter('scale', game_width, -1),  # 宽度对齐，高度自动计算
+                                    temp_material_path, 
+                                    vcodec='libx264', 
+                                    preset='medium'
+                                )
+                                .overwrite_output()
+                                .run(quiet=True)
+                            )
                     else:
                         # 多个素材需要拼接
                         # 先将每个素材宽度对齐到游戏宽度
@@ -295,14 +417,28 @@ class VideoMergeNode:
                             for resized_material in resized_materials:
                                 f.write(f"file '{resized_material}'\n")
                         
-                        # 使用concat demuxer拼接视频
-                        (
-                            ffmpeg
-                            .input(concat_file, format='concat', safe=0)
-                            .output(temp_material_path, vcodec='libx264', preset='medium')
-                            .overwrite_output()
-                            .run(quiet=True)
-                        )
+                        # 使用concat demuxer拼接视频，兼容音频情况
+                        # 检查是否有任何素材有音频
+                        has_any_audio = any(m['info']['has_audio'] for m in used_materials)
+                        
+                        if has_any_audio:
+                            # 有音频的情况
+                            (
+                                ffmpeg
+                                .input(concat_file, format='concat', safe=0)
+                                .output(temp_material_path, vcodec='libx264', acodec='aac', preset='medium')
+                                .overwrite_output()
+                                .run(quiet=True)
+                            )
+                        else:
+                            # 没有音频的情况
+                            (
+                                ffmpeg
+                                .input(concat_file, format='concat', safe=0)
+                                .output(temp_material_path, vcodec='libx264', preset='medium')
+                                .overwrite_output()
+                                .run(quiet=True)
+                            )
                         
                         # 清理concat文件和临时缩放文件
                         try:
@@ -312,22 +448,37 @@ class VideoMergeNode:
                         except:
                             pass
                         
-                        # 截取到游戏长度
+                        # 截取到游戏长度，兼容音频情况
                         temp_material_cropped = os.path.join(temp_dir, f"temp_material_cropped_{game_filename}.mp4")
-                        (
-                            ffmpeg
-                            .input(temp_material_path, t=game_duration)
-                            .output(temp_material_cropped, vcodec='libx264', preset='medium')
-                            .overwrite_output()
-                            .run(quiet=True)
-                        )
+                        
+                        # 检查临时素材文件是否有音频
+                        temp_material_info = self.get_video_info(temp_material_path)
+                        
+                        if temp_material_info and temp_material_info['has_audio']:
+                            # 有音频的情况
+                            (
+                                ffmpeg
+                                .input(temp_material_path, t=game_duration)
+                                .output(temp_material_cropped, vcodec='libx264', acodec='aac', preset='medium')
+                                .overwrite_output()
+                                .run(quiet=True)
+                            )
+                        else:
+                            # 没有音频的情况
+                            (
+                                ffmpeg
+                                .input(temp_material_path, t=game_duration)
+                                .output(temp_material_cropped, vcodec='libx264', preset='medium')
+                                .overwrite_output()
+                                .run(quiet=True)
+                            )
                         
                         # 替换临时文件
                         os.remove(temp_material_path)
                         temp_material_path = temp_material_cropped
                     
                     # 合并素材和游戏视频
-                    if self.merge_videos_vertically(temp_material_path, game_video, output_file, position):
+                    if self.merge_videos_vertically(temp_material_path, game_video, output_file, position, audio_mode, material_audio_volume, game_audio_volume):
                         processed_count += 1
                         output_paths.append(output_file)
                         print(f"成功合并: {game_filename} -> {output_file}")
