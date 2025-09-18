@@ -46,6 +46,7 @@ class VideoMergeNode:
             "optional": {
                 "material_path": ("STRING", {"default": "", "multiline": False, "tooltip": "直接输入素材文件夹的完整路径，优先级高于下拉框选择"}),
                 "game_path": ("STRING", {"default": "", "multiline": False, "tooltip": "直接输入游戏文件夹的完整路径，优先级高于下拉框选择"}),
+                "gif_path": ("STRING", {"default": "", "multiline": False, "tooltip": "GIF动态图路径，如果存在则在素材和游戏视频结合处叠加显示"}),
             }
         }
     
@@ -205,7 +206,7 @@ class VideoMergeNode:
             print(f"视频缩放失败 {input_path}: {str(e)}")
             return False
     
-    def merge_videos_vertically(self, material_path, game_path, output_path, position="up", audio_mode="game_only", material_audio_volume=0.5, game_audio_volume=0.5):
+    def merge_videos_vertically(self, material_path, game_path, output_path, position="up", audio_mode="game_only", material_audio_volume=0.5, game_audio_volume=0.5, gif_path=""):
         """垂直合并视频"""
         try:
             # 获取视频信息用于调试
@@ -225,6 +226,48 @@ class VideoMergeNode:
                 
                 # 使用vstack filter合并视频
                 video_output = ffmpeg.filter([material_input.video, game_input.video], 'vstack', inputs=2)
+                
+                # 检查是否需要叠加GIF
+                if gif_path and gif_path.strip() and os.path.exists(gif_path.strip()):
+                    print(f"  检测到GIF文件: {os.path.basename(gif_path)}")
+                    
+                    # 获取GIF信息
+                    gif_info = self.get_video_info(gif_path.strip())
+                    if not gif_info:
+                        print(f"  警告: 无法获取GIF信息，跳过GIF叠加")
+                    else:
+                        gif_input = ffmpeg.input(gif_path.strip())
+                        
+                        # 获取合并后视频的尺寸
+                        material_height = material_info['height']
+                        game_height = game_info['height']
+                        video_width = material_info['width']  # 两个视频宽度相同
+                        total_height = material_height + game_height
+                        
+                        # 计算GIF缩放后的高度（等比缩放）
+                        gif_original_width = gif_info['width']
+                        gif_original_height = gif_info['height']
+                        gif_new_height = int((video_width * gif_original_height) / gif_original_width)
+                        
+                        # 确保高度是偶数（视频编码要求）
+                        if gif_new_height % 2 != 0:
+                            gif_new_height += 1
+                        
+                        print(f"  GIF原始尺寸: {gif_original_width}x{gif_original_height}")
+                        print(f"  GIF缩放尺寸: {video_width}x{gif_new_height}")
+                        
+                        # 缩放GIF到与游戏视频相同的宽度
+                        gif_scaled = gif_input.video.filter('scale', video_width, gif_new_height)
+                        
+                        # 计算GIF位置：在结合处居中显示
+                        # GIF的中心位置应该在结合处（material_height位置）
+                        gif_center_y = material_height
+                        
+                        # 叠加缩放后的GIF到视频上
+                        video_output = ffmpeg.filter([video_output, gif_scaled], 'overlay', 
+                                                   x='(W-w)/2',  # 水平居中
+                                                   y=f'{gif_center_y}-h/2')  # 垂直居中在结合处
+                        print(f"  GIF叠加位置: 水平居中，垂直位置在结合处 (y={gif_center_y})")
                 
                 # 根据音频模式处理音频
                 if audio_mode == "mix":
@@ -289,6 +332,47 @@ class VideoMergeNode:
                 # 使用vstack filter合并视频
                 video_output = ffmpeg.filter([game_input.video, material_input.video], 'vstack', inputs=2)
                 
+                # 检查是否需要叠加GIF
+                if gif_path and gif_path.strip() and os.path.exists(gif_path.strip()):
+                    print(f"  检测到GIF文件: {os.path.basename(gif_path)}")
+                    
+                    # 获取GIF信息
+                    gif_info = self.get_video_info(gif_path.strip())
+                    if not gif_info:
+                        print(f"  警告: 无法获取GIF信息，跳过GIF叠加")
+                    else:
+                        gif_input = ffmpeg.input(gif_path.strip())
+                        
+                        # 获取合并后视频的尺寸
+                        material_height = material_info['height']
+                        game_height = game_info['height']
+                        video_width = game_info['width']  # 两个视频宽度相同
+                        
+                        # 计算GIF缩放后的高度（等比缩放）
+                        gif_original_width = gif_info['width']
+                        gif_original_height = gif_info['height']
+                        gif_new_height = int((video_width * gif_original_height) / gif_original_width)
+                        
+                        # 确保高度是偶数（视频编码要求）
+                        if gif_new_height % 2 != 0:
+                            gif_new_height += 1
+                        
+                        print(f"  GIF原始尺寸: {gif_original_width}x{gif_original_height}")
+                        print(f"  GIF缩放尺寸: {video_width}x{gif_new_height}")
+                        
+                        # 缩放GIF到与游戏视频相同的宽度
+                        gif_scaled = gif_input.video.filter('scale', video_width, gif_new_height)
+                        
+                        # 计算GIF位置：在结合处居中显示
+                        # GIF的中心位置应该在结合处（game_height位置）
+                        gif_center_y = game_height
+                        
+                        # 叠加缩放后的GIF到视频上
+                        video_output = ffmpeg.filter([video_output, gif_scaled], 'overlay', 
+                                                   x='(W-w)/2',  # 水平居中
+                                                   y=f'{gif_center_y}-h/2')  # 垂直居中在结合处
+                        print(f"  GIF叠加位置: 水平居中，垂直位置在结合处 (y={gif_center_y})")
+                
                 # 根据音频模式处理音频
                 if audio_mode == "mix":
                     # 混音模式：先检查音频状态
@@ -351,7 +435,7 @@ class VideoMergeNode:
             print(f"视频合并失败: {str(e)}")
             return False
     
-    def merge_videos(self, material_folder, game_folder, position, audio_mode, material_audio_volume, game_audio_volume, output_folder_name, material_path="", game_path=""):
+    def merge_videos(self, material_folder, game_folder, position, audio_mode, material_audio_volume, game_audio_volume, output_folder_name, material_path="", game_path="", gif_path=""):
         """
         合并视频文件
         
@@ -365,6 +449,7 @@ class VideoMergeNode:
             output_folder_name: 输出文件夹名字
             material_path: 直接输入的素材文件夹路径（可选，优先级高于下拉框）
             game_path: 直接输入的游戏文件夹路径（可选，优先级高于下拉框）
+            gif_path: GIF动态图路径（可选，如果存在则在结合处叠加显示）
         """
         try:
             # 使用ComfyUI的默认输入和输出路径
@@ -613,7 +698,7 @@ class VideoMergeNode:
                         temp_material_path = temp_material_cropped
                     
                     # 合并素材和游戏视频
-                    if self.merge_videos_vertically(temp_material_path, game_video, output_file, position, audio_mode, material_audio_volume, game_audio_volume):
+                    if self.merge_videos_vertically(temp_material_path, game_video, output_file, position, audio_mode, material_audio_volume, game_audio_volume, gif_path):
                         processed_count += 1
                         output_paths.append(output_file)
                         print(f"成功合并: {game_filename} -> {output_file}")
