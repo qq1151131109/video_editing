@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 import ffmpeg
 import folder_paths
+import shutil
 
 class VideoMergeNode:
     """
@@ -53,7 +54,7 @@ class VideoMergeNode:
     FUNCTION = "merge_videos"
     CATEGORY = "video_editing"
     
-    def get_video_info(self, video_path):
+    def get_video_info(self, video_path, threshold_db=-60.0):
         """获取视频信息"""
         try:
             probe = ffmpeg.probe(video_path)
@@ -62,13 +63,82 @@ class VideoMergeNode:
             
             if not video_stream:
                 return None
-                
+            
+            print(f"音频检测 - 文件: {os.path.basename(video_path)}")
+            print(f"  静音阈值: {threshold_db} dB")
+            
+            # 第一步：检查是否有音轨
+            has_audio_track = audio_stream is not None
+            print(f"  第一步 - 音轨检测: {'有音轨' if has_audio_track else '无音轨'}")
+            
+            if audio_stream:
+                print(f"    音频编码: {audio_stream.get('codec_name', '未知')}")
+                print(f"    音频时长: {audio_stream.get('duration', '未知')}")
+                print(f"    采样率: {audio_stream.get('sample_rate', '未知')}")
+            
+            # 第二步：如果有音轨，检测音量
+            has_audio = False
+            if has_audio_track:
+                print(f"  第二步 - 音量检测:")
+                try:
+                    # 使用ffmpeg-python分析音量
+                    input_stream = ffmpeg.input(video_path)
+                    audio_stream_test = input_stream.audio
+                    
+                    # 创建音量检测流
+                    volume_stream = audio_stream_test.filter('volumedetect')
+                    
+                    # 输出到null设备进行分析
+                    output_stream = ffmpeg.output(volume_stream, 'pipe:', format='null')
+                    
+                    # 运行分析
+                    process = ffmpeg.run(output_stream, capture_stdout=True, capture_stderr=True, quiet=True)
+                    
+                    # 解析stderr中的音量信息
+                    stderr_output = process[1].decode('utf-8') if process[1] else ''
+                    
+                    if 'mean_volume:' in stderr_output:
+                        # 提取音量信息
+                        lines = stderr_output.split('\n')
+                        for line in lines:
+                            if 'mean_volume:' in line:
+                                volume_str = line.split('mean_volume:')[1].strip()
+                                try:
+                                    volume_db = float(volume_str.split()[0])
+                                    print(f"    平均音量: {volume_db} dB")
+                                    
+                                    # 如果音量大于阈值，认为有声音
+                                    has_audio = volume_db > threshold_db
+                                    print(f"    音量判断: {'有声音' if has_audio else '静音'} (阈值: {threshold_db} dB)")
+                                    break
+                                except Exception as parse_e:
+                                    print(f"    音量解析失败: {parse_e}")
+                                    has_audio = True  # 解析失败时默认认为有声音
+                                    print(f"    音量判断: 有声音（解析失败）")
+                                    break
+                        else:
+                            has_audio = True
+                            print(f"    音量判断: 有声音（未找到音量信息）")
+                    else:
+                        has_audio = True
+                        print(f"    音量判断: 有声音（无音量信息）")
+                        
+                except Exception as volume_e:
+                    print(f"    音量检测异常: {volume_e}")
+                    has_audio = True  # 检测失败时默认认为有声音
+                    print(f"    音量判断: 有声音（检测失败）")
+            else:
+                print(f"  第二步 - 跳过音量检测（无音轨）")
+                has_audio = False
+            
+            print(f"  最终判断: {'有音频' if has_audio else '无音频'}")
+            
             return {
                 'width': int(video_stream['width']),
                 'height': int(video_stream['height']),
                 'duration': float(probe['format']['duration']),
                 'fps': eval(video_stream['r_frame_rate']),
-                'has_audio': audio_stream is not None
+                'has_audio': has_audio
             }
         except Exception as e:
             print(f"获取视频信息失败 {video_path}: {str(e)}")
@@ -93,10 +163,15 @@ class VideoMergeNode:
             
             # 使用ffmpeg进行缩放，兼容有声音和没有声音的情况
             input_stream = ffmpeg.input(input_path)
-            video_info = self.get_video_info(input_path)
             
-            if video_info and video_info['has_audio']:
+            print(f"缩放视频: {os.path.basename(input_path)} -> {os.path.basename(output_path)}")
+            print(f"  原始尺寸: {original_width}x{original_height}")
+            print(f"  目标尺寸: {target_width}x{new_height}")
+            print(f"  有音频: {video_info['has_audio']}")
+            
+            if video_info['has_audio']:
                 # 有音频的情况
+                print("  使用音频输出模式")
                 (
                     ffmpeg
                     .output(
@@ -108,10 +183,11 @@ class VideoMergeNode:
                         preset='medium'
                     )
                     .overwrite_output()
-                    .run(quiet=True)
+                    .run(quiet=False)  # 显示详细信息
                 )
             else:
                 # 没有音频的情况
+                print("  使用无音频输出模式")
                 (
                     ffmpeg
                     .output(
@@ -121,7 +197,7 @@ class VideoMergeNode:
                         preset='medium'
                     )
                     .overwrite_output()
-                    .run(quiet=True)
+                    .run(quiet=False)  # 显示详细信息
                 )
             
             return True
@@ -132,6 +208,15 @@ class VideoMergeNode:
     def merge_videos_vertically(self, material_path, game_path, output_path, position="up", audio_mode="game_only", material_audio_volume=0.5, game_audio_volume=0.5):
         """垂直合并视频"""
         try:
+            # 获取视频信息用于调试
+            material_info = self.get_video_info(material_path)
+            game_info = self.get_video_info(game_path)
+            
+            print(f"垂直合并视频:")
+            print(f"  素材: {os.path.basename(material_path)} (有音频: {material_info['has_audio'] if material_info else '未知'})")
+            print(f"  游戏: {os.path.basename(game_path)} (有音频: {game_info['has_audio'] if game_info else '未知'})")
+            print(f"  位置: {position}, 音频模式: {audio_mode}")
+            
             # 根据位置确定视频顺序并合并
             if position == "up":
                 # 素材在上，游戏在下
@@ -143,17 +228,42 @@ class VideoMergeNode:
                 
                 # 根据音频模式处理音频
                 if audio_mode == "mix":
-                    # 混音模式：使用ffmpeg-python库处理音频放大
-                    # 对素材音频应用音量调整
-                    material_audio_adjusted = material_input.audio.filter('volume', material_audio_volume)
-                    # 对游戏音频应用音量调整
-                    game_audio_adjusted = game_input.audio.filter('volume', game_audio_volume)
+                    # 混音模式：先检查音频状态
+                    print(f"  混音模式 - 素材音量: {material_audio_volume}, 游戏音量: {game_audio_volume}")
                     
-                    # 使用amix filter混合音频
-                    audio_output = ffmpeg.filter([material_audio_adjusted, game_audio_adjusted], 'amix', inputs=2, duration='longest')
-                    print("混音模式：成功创建混音")
+                    # 检查素材和游戏视频的音频状态
+                    material_info = self.get_video_info(material_path)
+                    game_info = self.get_video_info(game_path)
+                    
+                    if not material_info or not game_info:
+                        print("  无法获取视频信息，使用游戏音频")
+                        audio_output = game_input.audio
+                    elif not material_info['has_audio'] and not game_info['has_audio']:
+                        # 两个视频都没有音频
+                        print("  错误：素材视频和游戏视频都没有音频，无法进行混音处理")
+                        raise ValueError("素材视频和游戏视频都没有音频，无法进行混音处理")
+                    elif not material_info['has_audio']:
+                        # 只有游戏视频有音频
+                        print("  素材视频没有音频，使用游戏音频")
+                        audio_output = game_input.audio
+                    elif not game_info['has_audio']:
+                        # 只有素材视频有音频
+                        print("  游戏视频没有音频，使用素材音频")
+                        audio_output = material_input.audio
+                    else:
+                        # 两个视频都有音频，进行混音
+                        print("  两个视频都有音频，进行混音处理")
+                        # 对素材音频应用音量调整
+                        material_audio_adjusted = material_input.audio.filter('volume', material_audio_volume)
+                        # 对游戏音频应用音量调整
+                        game_audio_adjusted = game_input.audio.filter('volume', game_audio_volume)
+                        
+                        # 使用amix filter混合音频
+                        audio_output = ffmpeg.filter([material_audio_adjusted, game_audio_adjusted], 'amix', inputs=2, duration='longest')
+                        print("  混音模式：成功创建混音")
                 else:
                     # 只使用游戏音频
+                    print("  使用游戏音频")
                     audio_output = game_input.audio
                 
                 # 输出合并后的视频
@@ -181,17 +291,42 @@ class VideoMergeNode:
                 
                 # 根据音频模式处理音频
                 if audio_mode == "mix":
-                    # 混音模式：使用ffmpeg-python库处理音频放大
-                    # 对素材音频应用音量调整
-                    material_audio_adjusted = material_input.audio.filter('volume', material_audio_volume)
-                    # 对游戏音频应用音量调整
-                    game_audio_adjusted = game_input.audio.filter('volume', game_audio_volume)
+                    # 混音模式：先检查音频状态
+                    print(f"  混音模式 - 素材音量: {material_audio_volume}, 游戏音量: {game_audio_volume}")
                     
-                    # 使用amix filter混合音频
-                    audio_output = ffmpeg.filter([material_audio_adjusted, game_audio_adjusted], 'amix', inputs=2, duration='longest')
-                    print("混音模式：成功创建混音")
+                    # 检查素材和游戏视频的音频状态
+                    material_info = self.get_video_info(material_path)
+                    game_info = self.get_video_info(game_path)
+                    
+                    if not material_info or not game_info:
+                        print("  无法获取视频信息，使用游戏音频")
+                        audio_output = game_input.audio
+                    elif not material_info['has_audio'] and not game_info['has_audio']:
+                        # 两个视频都没有音频
+                        print("  错误：素材视频和游戏视频都没有音频，无法进行混音处理")
+                        raise ValueError("素材视频和游戏视频都没有音频，无法进行混音处理")
+                    elif not material_info['has_audio']:
+                        # 只有游戏视频有音频
+                        print("  素材视频没有音频，使用游戏音频")
+                        audio_output = game_input.audio
+                    elif not game_info['has_audio']:
+                        # 只有素材视频有音频
+                        print("  游戏视频没有音频，使用素材音频")
+                        audio_output = material_input.audio
+                    else:
+                        # 两个视频都有音频，进行混音
+                        print("  两个视频都有音频，进行混音处理")
+                        # 对素材音频应用音量调整
+                        material_audio_adjusted = material_input.audio.filter('volume', material_audio_volume)
+                        # 对游戏音频应用音量调整
+                        game_audio_adjusted = game_input.audio.filter('volume', game_audio_volume)
+                        
+                        # 使用amix filter混合音频
+                        audio_output = ffmpeg.filter([material_audio_adjusted, game_audio_adjusted], 'amix', inputs=2, duration='longest')
+                        print("  混音模式：成功创建混音")
                 else:
                     # 只使用游戏音频
+                    print("  使用游戏音频")
                     audio_output = game_input.audio
                 
                 # 输出合并后的视频
@@ -485,7 +620,6 @@ class VideoMergeNode:
                     
                     # 清理临时文件和目录
                     try:
-                        import shutil
                         shutil.rmtree(temp_dir)
                     except:
                         pass
@@ -495,14 +629,17 @@ class VideoMergeNode:
                     continue
             
             if processed_count == 0:
-                return (f"未成功处理任何视频",)
+                return ("",)  # 没有可保存的视频时返回空字符串
             else:
-                result_message = f"成功处理 {processed_count} 个游戏视频，保存到: {output_path}\n"
-                result_message += f"输出文件:\n" + "\n".join(output_paths)
-                return (result_message,)
+                # 返回输出文件的目录路径
+                print(f"成功处理 {processed_count} 个游戏视频")
+                print(f"输出目录: {output_path}")
+                print(f"输出文件: {output_paths}")
+                return (output_path,)
                 
         except Exception as e:
-            return (f"处理过程中出错: {str(e)}",)
+            print(f"处理过程中出错: {str(e)}")
+            return ("",)  # 出错时也返回空字符串
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
