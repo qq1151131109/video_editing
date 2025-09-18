@@ -472,7 +472,7 @@ class EnhancedVideoCropNode:
         }
 
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("result",)
+    RETURN_NAMES = ("output_path",)
     FUNCTION = "enhanced_crop_videos"
     CATEGORY = "video_editing"
 
@@ -627,15 +627,13 @@ class EnhancedVideoCropNode:
 
             if preview_only:
                 if preview_count == 0:
-                    return ("未找到可处理的视频文件",)
-                return (f"预览模式完成 - {', '.join(result_parts)}，预览视频保存到: {os.path.join(output_path, 'previews')}",)
+                    return (output_path,)  # 即使没有找到文件也返回输出路径
+                return (os.path.join(output_path, 'previews'),)  # 返回预览文件夹路径
 
             if processed_count == 0:
-                return ("未找到可处理的视频文件",)
+                return (output_path,)  # 返回输出路径
 
-            result_parts.append(f"裁切视频: {processed_count} 个")
-
-            return (f"处理完成 - {', '.join(result_parts)}，文件保存到: {output_path}",)
+            return (output_path,)  # 返回输出文件夹路径
 
         except Exception as e:
             return (f"处理过程中出错: {str(e)}",)
