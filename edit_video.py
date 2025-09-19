@@ -330,8 +330,10 @@ class EnhancedVideoCropNode:
                         cache_dir = os.path.join(output_dir, "video_previews")
                         os.makedirs(cache_dir, exist_ok=True)
 
-                        # 生成唯一的帧文件名
-                        frame_filename = f"{filename}_{int(frame_time)}s_frame.jpg"
+                        # 生成唯一的帧文件名，包含路径哈希避免同名文件冲突
+                        import hashlib
+                        path_hash = hashlib.md5(video_file.encode('utf-8')).hexdigest()[:8]
+                        frame_filename = f"{filename}_{path_hash}_{int(frame_time)}s_frame.jpg"
                         frame_path = os.path.join(cache_dir, frame_filename)
 
                         # 检查帧文件是否已存在且比视频文件新
