@@ -334,14 +334,21 @@ class EnhancedVideoCropNode:
                         frame_filename = f"{filename}_{int(frame_time)}s_frame.jpg"
                         frame_path = os.path.join(cache_dir, frame_filename)
 
-                        # 如果帧文件已存在，直接返回
+                        # 检查帧文件是否已存在且比视频文件新
                         if os.path.exists(frame_path):
-                            probe = ffmpeg.probe(video_file)
-                            video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-                            if video_stream:
-                                width = int(video_stream['width'])
-                                height = int(video_stream['height'])
-                                return frame_path, width, height
+                            video_mtime = os.path.getmtime(video_file)
+                            frame_mtime = os.path.getmtime(frame_path)
+                            if frame_mtime > video_mtime:
+                                # 缓存有效，直接返回
+                                probe = ffmpeg.probe(video_file)
+                                video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+                                if video_stream:
+                                    width = int(video_stream['width'])
+                                    height = int(video_stream['height'])
+                                    print(f"🎯 使用缓存的预览帧: {frame_path}")
+                                    return frame_path, width, height
+                            else:
+                                print(f"🔄 视频文件已更新，重新生成预览帧: {video_file}")
 
                         # 提取视频帧
                         (
@@ -366,14 +373,25 @@ class EnhancedVideoCropNode:
                             preview_path_root = os.path.join(output_dir, preview_filename)
 
                             try:
-                                # 复制帧文件到预览位置（在video_previews子目录）
+                                # 检查预览图片是否需要更新
                                 import shutil
-                                shutil.copy2(frame_path, preview_path_subdir)
-                                print(f"📸 预览图片已生成: {preview_path_subdir}")
+                                need_update = True
 
-                                # 同时在output根目录也生成一份供JavaScript访问
-                                shutil.copy2(frame_path, preview_path_root)
-                                print(f"📸 JavaScript预览图片已生成: {preview_path_root}")
+                                if os.path.exists(preview_path_root):
+                                    frame_mtime = os.path.getmtime(frame_path)
+                                    preview_mtime = os.path.getmtime(preview_path_root)
+                                    need_update = frame_mtime > preview_mtime
+
+                                if need_update:
+                                    # 复制帧文件到预览位置（在video_previews子目录）
+                                    shutil.copy2(frame_path, preview_path_subdir)
+                                    print(f"📸 预览图片已生成: {preview_path_subdir}")
+
+                                    # 同时在output根目录也生成一份供JavaScript访问
+                                    shutil.copy2(frame_path, preview_path_root)
+                                    print(f"📸 JavaScript预览图片已生成: {preview_path_root}")
+                                else:
+                                    print(f"🎯 使用缓存的预览图片: {preview_path_root}")
                             except Exception as e:
                                 print(f"⚠️ 生成预览图片失败: {e}")
 
