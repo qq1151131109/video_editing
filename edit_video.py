@@ -178,6 +178,24 @@ class EnhancedVideoCropNode:
         else:
             return os.path.join(input_dir, input_folder)
 
+    @classmethod
+    def get_input_folders(cls):
+        """获取输入目录下的所有子文件夹"""
+        try:
+            input_dir = folder_paths.get_input_directory()
+            if not os.path.exists(input_dir):
+                return ["input"]
+
+            folders = ["input"]  # 默认包含根目录
+            for item in os.listdir(input_dir):
+                item_path = os.path.join(input_dir, item)
+                if os.path.isdir(item_path):
+                    folders.append(item)
+
+            return sorted(folders)
+        except Exception:
+            return ["input"]
+
 
     @classmethod
     def get_aspect_ratios(cls):
@@ -487,7 +505,7 @@ class EnhancedVideoCropNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "input_folder": (VideoCropNode.get_input_folders(), {"default": "input"}),
+                "input_folder": (EnhancedVideoCropNode.get_input_folders(), {"default": "input"}),
                 "output_folder_name": ("STRING", {"default": "cropped_videos", "multiline": False}),
                 "aspect_ratio": (list(cls.get_aspect_ratios().keys()), {"default": "16:9"}),
             },

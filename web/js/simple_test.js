@@ -859,10 +859,7 @@ app.registerExtension({
                             "crop_width": 1920,
                             "crop_height": 1080
                         },
-                        "class_type": "EnhancedVideoCropNode",
-                        "_meta": {
-                            "title": "Auto Preview Generator"
-                        }
+                        "class_type": "EnhancedVideoCropNode"
                     }
                 };
 
@@ -881,18 +878,22 @@ app.registerExtension({
                     if (response.ok) {
                         return response.json();
                     }
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    // 获取详细错误信息
+                    return response.text().then(text => {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${text}`);
+                    });
                 })
                 .then(data => {
                     console.log("✅ 预览图片生成请求已提交", data);
 
-                    // 等待2秒后重新尝试加载预览
+                    // 等待3秒后重新尝试加载预览
                     setTimeout(() => {
                         this.tryLoadPreviewVideo(0, false);
-                    }, 2000);
+                    }, 3000);
                 })
                 .catch(error => {
                     console.log("❌ 预览图片生成失败:", error.message);
+                    console.log("🔧 工作流内容:", JSON.stringify(previewWorkflow, null, 2));
                 });
             };
 
