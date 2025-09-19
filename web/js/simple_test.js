@@ -743,9 +743,9 @@ app.registerExtension({
                     hasMouse: !!previewWidget.mouse
                 });
 
-                // 延迟尝试加载预览视频，确保所有widgets都已初始化
+                // 延迟尝试加载预览视频，确保所有widgets都已初始化（静默模式避免初始404错误）
                 setTimeout(() => {
-                    this.tryLoadPreviewVideo();
+                    this.tryLoadPreviewVideo(0, true);
                 }, 100);
 
                 // 监听input_folder变化
@@ -762,18 +762,22 @@ app.registerExtension({
                 return result;
             };
 
-            // 简化的预览图片加载函数
-            nodeType.prototype.tryLoadPreviewVideo = function(retryCount = 0) {
-                console.log(`🎬 尝试加载预览图片... (重试次数: ${retryCount})`);
+            // 简化的预览图片加载函数（静默模式，不产生错误日志）
+            nodeType.prototype.tryLoadPreviewVideo = function(retryCount = 0, silent = true) {
+                if (!silent) {
+                    console.log(`🎬 尝试加载预览图片... (重试次数: ${retryCount})`);
+                }
 
                 // 获取当前输入文件夹
                 const inputFolderWidget = this.widgets.find(w => w.name === "input_folder");
                 if (!inputFolderWidget) {
-                    console.log("⚠️ 未找到input_folder参数");
+                    if (!silent) {
+                        console.log("⚠️ 未找到input_folder参数");
+                    }
                     // 如果重试次数少于3次，延迟重试
                     if (retryCount < 3) {
                         setTimeout(() => {
-                            this.tryLoadPreviewVideo(retryCount + 1);
+                            this.tryLoadPreviewVideo(retryCount + 1, silent);
                         }, 500);
                     }
                     return;
@@ -816,7 +820,9 @@ app.registerExtension({
                 };
 
                 testImage.onerror = (e) => {
-                    console.log(`❌ 无法访问预览图片: ${previewImagePath}`);
+                    if (!silent) {
+                        console.log(`❌ 无法访问预览图片: ${previewImagePath}`);
+                    }
 
                     // 首先尝试用现有的预览图片
                     const existingPreviews = ["test", "input", "video"];
@@ -847,8 +853,8 @@ app.registerExtension({
                         }
                     }
 
-                    // 如果没有找到现有预览，尝试生成新的
-                    if (!foundExisting) {
+                    // 如果没有找到现有预览，静默处理（不显示错误信息）
+                    if (!foundExisting && !silent) {
                         console.log("🔄 尝试生成预览图片...");
                         this.generatePreviewImage(inputFolder);
                     }
@@ -900,9 +906,9 @@ app.registerExtension({
                         clearTimeout(this.previewTimer);
                     }
 
-                    // 设置新的定时器
+                    // 设置新的定时器（非静默模式，用户主动切换文件夹）
                     this.previewTimer = setTimeout(() => {
-                        this.tryLoadPreviewVideo();
+                        this.tryLoadPreviewVideo(0, false);
                     }, 500); // 500ms防抖延迟
                 };
 
