@@ -860,6 +860,15 @@ app.registerExtension({
                             "crop_height": 1080
                         },
                         "class_type": "EnhancedVideoCropNode"
+                    },
+                    "2": {
+                        "inputs": {
+                            "text": ["1", 0]
+                        },
+                        "class_type": "ShowText|pysssss",
+                        "_meta": {
+                            "title": "Preview Output"
+                        }
                     }
                 };
 

@@ -384,39 +384,6 @@ class EnhancedVideoCropNode:
             return None, None, None
 
 
-    @classmethod
-    def generate_5s_preview(cls, video_path, output_path, duration=5):
-        """
-        生成5秒原始视频预览（不裁切，供前端显示）
-
-        Args:
-            video_path: 原视频文件路径
-            output_path: 预览视频保存路径
-            duration: 预览时长（秒）
-        """
-        try:
-            # 使用ffmpeg生成5秒预览视频
-            (
-                ffmpeg
-                .input(video_path, t=duration)  # 提取前5秒
-                .output(
-                    output_path,
-                    vcodec='libx264',
-                    acodec='aac',
-                    preset='medium',
-                    crf=23,
-                    movflags='faststart'  # 优化网络播放
-                )
-                .overwrite_output()
-                .run(quiet=True)
-            )
-
-            print(f"✅ 5秒预览视频生成成功: {output_path}")
-            return True
-
-        except Exception as e:
-            print(f"生成5秒预览视频失败: {str(e)}")
-            return False
 
     @classmethod
     def generate_preview_video(cls, video_path, crop_coords, output_path, duration_limit=10):
@@ -541,19 +508,6 @@ class EnhancedVideoCropNode:
             frame_path, frame_width, frame_height = self.extract_video_frame(input_folder)
             if frame_path:
                 print(f"📸 视频预览帧已生成: {frame_path}")
-
-                # 生成5秒预览视频供前端播放
-                input_path = EnhancedVideoCropNode.get_input_path(input_folder)
-                for filename in sorted(os.listdir(input_path)):
-                    if filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.wmv')):
-                        source_video = os.path.join(input_path, filename)
-                        preview_dir = os.path.dirname(frame_path)
-                        preview_video_name = f"{Path(filename).stem}_preview_5s.mp4"
-                        preview_video_path = os.path.join(preview_dir, preview_video_name)
-
-                        if self.generate_5s_preview(source_video, preview_video_path):
-                            print(f"🎬 5秒预览视频已生成: {preview_video_path}")
-                        break
             else:
                 print("⚠️ 未能提取视频帧")
             # 获取输入输出路径
