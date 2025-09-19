@@ -700,11 +700,21 @@ class VideoMergeNode:
                         except:
                             pass
                         
+                        # 检查合并后的素材时长是否足够支持游戏视频时长
+                        temp_material_info = self.get_video_info(temp_material_path)
+                        if not temp_material_info:
+                            print(f"  警告: 无法获取合并后素材视频信息，跳过游戏视频: {game_filename}")
+                            continue
+                        
+                        temp_material_duration = temp_material_info['duration']
+                        if temp_material_duration < game_duration:
+                            print(f"  警告: 合并后素材时长 ({temp_material_duration:.2f}秒) 不足以支持游戏视频时长 ({game_duration:.2f}秒)，跳过游戏视频: {game_filename}")
+                            continue
+                        
+                        print(f"  合并后素材时长: {temp_material_duration:.2f}秒，游戏视频时长: {game_duration:.2f}秒")
+                        
                         # 截取到游戏长度，兼容音频情况
                         temp_material_cropped = os.path.join(temp_dir, f"temp_material_cropped_{game_filename}.mp4")
-                        
-                        # 检查临时素材文件是否有音频
-                        temp_material_info = self.get_video_info(temp_material_path)
                         
                         if temp_material_info and temp_material_info['has_audio']:
                             # 有音频的情况
