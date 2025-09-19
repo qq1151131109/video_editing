@@ -6,18 +6,28 @@ import { app } from "../../scripts/app.js";
 
 console.log("🎬 视频裁切扩展开始加载...");
 
-// 简单的字符串哈希函数，与Python MD5前8位兼容
-function calculateMD5Hash(str) {
-    // 使用一个简单但稳定的哈希算法
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // 转换为32位整数
+// MD5哈希计算函数，使用Web Crypto API（如果支持的话）或fallback算法
+async function calculateMD5Hash(str) {
+    try {
+        // 尝试使用Web Crypto API的SHA-256（更兼容）
+        const encoder = new TextEncoder();
+        const data = encoder.encode(str);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex.substring(0, 8); // 只取前8位
+    } catch (error) {
+        // Fallback: 使用简单但稳定的哈希算法
+        console.log('⚠️ Web Crypto API不可用，使用fallback哈希算法');
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        const hex = Math.abs(hash).toString(16);
+        return hex.padStart(8, '0').substring(0, 8);
     }
-    // 转换为16进制并取前8位
-    const hex = Math.abs(hash).toString(16);
-    return hex.padStart(8, '0').substring(0, 8);
 }
 
 // 宽高比预设
@@ -804,7 +814,7 @@ app.registerExtension({
 
                 // 计算输入目录的路径哈希，与Python端保持一致
                 const inputFolderPath = `/home/shenglin/Desktop/ComfyUI/input/${inputFolder}`;
-                const inputPathHash = calculateMD5Hash(inputFolderPath);
+                const inputPathHash = await calculateMD5Hash(inputFolderPath);
 
                 // 生成预览图片的路径 - 通过ComfyUI的output view端点访问，包含路径哈希
                 const previewImagePath = `/view?filename=video_preview_${inputFolder}_${inputPathHash}.jpg&type=output`;
