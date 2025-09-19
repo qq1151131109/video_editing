@@ -362,7 +362,7 @@ class EnhancedVideoCropNode:
 
                             # 额外生成JavaScript期望的预览图片文件
                             preview_filename = f"video_preview_{input_folder}.jpg"
-                            preview_path = os.path.join(output_dir, preview_filename)
+                            preview_path = os.path.join(cache_dir, preview_filename)
 
                             try:
                                 # 复制帧文件到预览位置
