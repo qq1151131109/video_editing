@@ -787,7 +787,7 @@ app.registerExtension({
             };
 
             // 简化的预览图片加载函数（静默模式，不产生错误日志）
-            nodeType.prototype.tryLoadPreviewVideo = function(retryCount = 0, silent = true) {
+            nodeType.prototype.tryLoadPreviewVideo = async function(retryCount = 0, silent = true) {
                 if (!silent) {
                     console.log(`🎬 尝试加载预览图片... (重试次数: ${retryCount})`);
                 }
