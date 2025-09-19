@@ -362,13 +362,18 @@ class EnhancedVideoCropNode:
 
                             # 额外生成JavaScript期望的预览图片文件
                             preview_filename = f"video_preview_{input_folder}.jpg"
-                            preview_path = os.path.join(cache_dir, preview_filename)
+                            preview_path_subdir = os.path.join(cache_dir, preview_filename)
+                            preview_path_root = os.path.join(output_dir, preview_filename)
 
                             try:
-                                # 复制帧文件到预览位置
+                                # 复制帧文件到预览位置（在video_previews子目录）
                                 import shutil
-                                shutil.copy2(frame_path, preview_path)
-                                print(f"📸 预览图片已生成: {preview_path}")
+                                shutil.copy2(frame_path, preview_path_subdir)
+                                print(f"📸 预览图片已生成: {preview_path_subdir}")
+
+                                # 同时在output根目录也生成一份供JavaScript访问
+                                shutil.copy2(frame_path, preview_path_root)
+                                print(f"📸 JavaScript预览图片已生成: {preview_path_root}")
                             except Exception as e:
                                 print(f"⚠️ 生成预览图片失败: {e}")
 
