@@ -236,13 +236,21 @@ class VideoMergeNode:
                     if not gif_info:
                         print(f"  警告: 无法获取GIF信息，跳过GIF叠加")
                     else:
-                        gif_input = ffmpeg.input(gif_path.strip())
-                        
-                        # 获取合并后视频的尺寸
+                        # 获取合并后视频的尺寸和时长
                         material_height = material_info['height']
                         game_height = game_info['height']
                         video_width = material_info['width']  # 两个视频宽度相同
                         total_height = material_height + game_height
+                        
+                        # 计算合并后视频的总时长（使用游戏视频时长）
+                        material_duration = material_info['duration']
+                        game_duration = game_info['duration']
+                        total_duration = game_duration  # 使用游戏视频时长作为目标时长
+                        
+                        print(f"  游戏视频时长: {game_duration:.2f}秒")
+                        print(f"  素材视频时长: {material_duration:.2f}秒")
+                        print(f"  目标合并时长: {total_duration:.2f}秒")
+                        print(f"  GIF原始时长: {gif_info['duration']:.2f}秒")
                         
                         # 计算GIF缩放后的高度（等比缩放）
                         gif_original_width = gif_info['width']
@@ -256,17 +264,25 @@ class VideoMergeNode:
                         print(f"  GIF原始尺寸: {gif_original_width}x{gif_original_height}")
                         print(f"  GIF缩放尺寸: {video_width}x{gif_new_height}")
                         
+                        # 创建GIF输入
+                        gif_input = ffmpeg.input(gif_path.strip())
+                        
+                        # 使用loop filter实现真正的循环播放
+                        gif_looped = gif_input.video.filter('loop', loop=-1, size=32767, start=0)
+                        
                         # 缩放GIF到与游戏视频相同的宽度
-                        gif_scaled = gif_input.video.filter('scale', video_width, gif_new_height)
+                        gif_scaled = gif_looped.filter('scale', video_width, gif_new_height)
                         
                         # 计算GIF位置：在结合处居中显示
                         # GIF的中心位置应该在结合处（material_height位置）
                         gif_center_y = material_height
                         
-                        # 叠加缩放后的GIF到视频上
+                        # 叠加缩放后的GIF到视频上，使用shortest=1确保输出时长由游戏视频决定
                         video_output = ffmpeg.filter([video_output, gif_scaled], 'overlay', 
                                                    x='(W-w)/2',  # 水平居中
-                                                   y=f'{gif_center_y}-h/2')  # 垂直居中在结合处
+                                                   y=f'{gif_center_y}-h/2',  # 垂直居中在结合处
+                                                   shortest=1)  # 输出时长由最短的输入决定（游戏视频）
+                        print(f"  GIF循环播放设置: 使用loop filter实现无限循环，输出时长由游戏视频决定")
                         print(f"  GIF叠加位置: 水平居中，垂直位置在结合处 (y={gif_center_y})")
                 
                 # 根据音频模式处理音频
@@ -341,12 +357,20 @@ class VideoMergeNode:
                     if not gif_info:
                         print(f"  警告: 无法获取GIF信息，跳过GIF叠加")
                     else:
-                        gif_input = ffmpeg.input(gif_path.strip())
-                        
-                        # 获取合并后视频的尺寸
+                        # 获取合并后视频的尺寸和时长
                         material_height = material_info['height']
                         game_height = game_info['height']
                         video_width = game_info['width']  # 两个视频宽度相同
+                        
+                        # 计算合并后视频的总时长（使用游戏视频时长）
+                        material_duration = material_info['duration']
+                        game_duration = game_info['duration']
+                        total_duration = game_duration  # 使用游戏视频时长作为目标时长
+                        
+                        print(f"  游戏视频时长: {game_duration:.2f}秒")
+                        print(f"  素材视频时长: {material_duration:.2f}秒")
+                        print(f"  目标合并时长: {total_duration:.2f}秒")
+                        print(f"  GIF原始时长: {gif_info['duration']:.2f}秒")
                         
                         # 计算GIF缩放后的高度（等比缩放）
                         gif_original_width = gif_info['width']
@@ -360,17 +384,25 @@ class VideoMergeNode:
                         print(f"  GIF原始尺寸: {gif_original_width}x{gif_original_height}")
                         print(f"  GIF缩放尺寸: {video_width}x{gif_new_height}")
                         
+                        # 创建GIF输入
+                        gif_input = ffmpeg.input(gif_path.strip())
+                        
+                        # 使用loop filter实现真正的循环播放
+                        gif_looped = gif_input.video.filter('loop', loop=-1, size=32767, start=0)
+                        
                         # 缩放GIF到与游戏视频相同的宽度
-                        gif_scaled = gif_input.video.filter('scale', video_width, gif_new_height)
+                        gif_scaled = gif_looped.filter('scale', video_width, gif_new_height)
                         
                         # 计算GIF位置：在结合处居中显示
                         # GIF的中心位置应该在结合处（game_height位置）
                         gif_center_y = game_height
                         
-                        # 叠加缩放后的GIF到视频上
+                        # 叠加缩放后的GIF到视频上，使用shortest=1确保输出时长由游戏视频决定
                         video_output = ffmpeg.filter([video_output, gif_scaled], 'overlay', 
                                                    x='(W-w)/2',  # 水平居中
-                                                   y=f'{gif_center_y}-h/2')  # 垂直居中在结合处
+                                                   y=f'{gif_center_y}-h/2',  # 垂直居中在结合处
+                                                   shortest=1)  # 输出时长由最短的输入决定（游戏视频）
+                        print(f"  GIF循环播放设置: 使用loop filter实现无限循环，输出时长由游戏视频决定")
                         print(f"  GIF叠加位置: 水平居中，垂直位置在结合处 (y={gif_center_y})")
                 
                 # 根据音频模式处理音频
