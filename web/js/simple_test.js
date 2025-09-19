@@ -875,7 +875,7 @@ app.registerExtension({
             nodeType.prototype.generatePreviewImage = function(inputFolder) {
                 console.log(`🎨 开始为文件夹 "${inputFolder}" 生成预览图片...`);
 
-                // 创建一个简单的工作流来生成预览图片
+                // 创建一个简单的工作流来生成预览图片（使用最小裁切尺寸以确保兼容性）
                 const previewWorkflow = {
                     "1": {
                         "inputs": {
@@ -884,8 +884,8 @@ app.registerExtension({
                             "aspect_ratio": "自定义",
                             "pos_x": 0,
                             "pos_y": 0,
-                            "crop_width": 1920,
-                            "crop_height": 1080
+                            "crop_width": 320,
+                            "crop_height": 240
                         },
                         "class_type": "EnhancedVideoCropNode"
                     },
