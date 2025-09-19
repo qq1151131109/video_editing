@@ -832,9 +832,9 @@ app.registerExtension({
                         console.log(`❌ 无法访问预览图片: ${previewImagePath}`);
                     }
 
-                    // 不使用备用预览图，直接提示用户执行节点生成预览
+                    // 自动生成预览图片（除非是静默的初始化加载）
                     if (!silent) {
-                        console.log("🔄 预览图片不存在，请执行节点生成预览");
+                        console.log("🔄 预览图片不存在，开始自动生成...");
                         this.generatePreviewImage(inputFolder);
                     }
                 };
@@ -843,16 +843,57 @@ app.registerExtension({
                 testImage.src = previewImagePath;
             };
 
-            // 生成预览图片的函数 - 现在只显示提示信息
+            // 生成预览图片的函数 - 切换文件夹时自动生成预览
             nodeType.prototype.generatePreviewImage = function(inputFolder) {
-                console.log(`💡 提示: 预览图片将在执行节点时自动生成 (文件夹: "${inputFolder}")`);
+                console.log(`🎨 开始为文件夹 "${inputFolder}" 生成预览图片...`);
 
-                // 显示默认提示，不进行API调用
-                const previewVideoWidget = this.widgets.find(w => w.name === "preview_video");
-                if (previewVideoWidget) {
-                    previewVideoWidget.value = "";
-                }
-                this.setDirtyCanvas(true, true);
+                // 创建一个简单的工作流来生成预览图片
+                const previewWorkflow = {
+                    "1": {
+                        "inputs": {
+                            "input_folder": inputFolder,
+                            "output_folder_name": "auto_preview",
+                            "aspect_ratio": "自定义",
+                            "pos_x": 0,
+                            "pos_y": 0,
+                            "crop_width": 1920,
+                            "crop_height": 1080
+                        },
+                        "class_type": "EnhancedVideoCropNode",
+                        "_meta": {
+                            "title": "Auto Preview Generator"
+                        }
+                    }
+                };
+
+                // 发送工作流到ComfyUI执行
+                fetch('/prompt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: previewWorkflow,
+                        client_id: Math.random().toString(36).substr(2, 9)
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                })
+                .then(data => {
+                    console.log("✅ 预览图片生成请求已提交", data);
+
+                    // 等待2秒后重新尝试加载预览
+                    setTimeout(() => {
+                        this.tryLoadPreviewVideo(0, false);
+                    }, 2000);
+                })
+                .catch(error => {
+                    console.log("❌ 预览图片生成失败:", error.message);
+                });
             };
 
             // 监听input_folder变化
