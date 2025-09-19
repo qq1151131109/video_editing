@@ -784,27 +784,35 @@ app.registerExtension({
                 }
 
                 const inputFolder = inputFolderWidget.value || "input";
-                console.log(`📁 输入文件夹: ${inputFolder}`);
+                if (!silent) {
+                    console.log(`📁 输入文件夹: ${inputFolder}`);
+                }
 
                 // 生成预览图片的路径 - 通过ComfyUI的output view端点访问
                 const previewImagePath = `/view?filename=video_preview_${inputFolder}.jpg&type=output`;
 
-                console.log(`🔍 尝试访问预览图片: ${previewImagePath}`);
+                if (!silent) {
+                    console.log(`🔍 尝试访问预览图片: ${previewImagePath}`);
+                }
 
                 // 测试预览图片是否存在
                 const testImage = new Image();
                 testImage.crossOrigin = 'anonymous';
 
                 testImage.onload = () => {
-                    console.log(`✅ 找到预览图片: ${previewImagePath}`);
-                    console.log(`📏 图片尺寸: ${testImage.width}×${testImage.height}`);
+                    if (!silent) {
+                        console.log(`✅ 找到预览图片: ${previewImagePath}`);
+                        console.log(`📏 图片尺寸: ${testImage.width}×${testImage.height}`);
+                    }
 
                     // 保存视频尺寸和预览图片路径到节点属性（内部使用）
                     if (testImage.width > 0) {
                         this.videoWidth = testImage.width;
                         this.videoHeight = testImage.height;
                         this.previewImagePath = previewImagePath;
-                        console.log(`📏 已保存视频尺寸: ${testImage.width}×${testImage.height}`);
+                        if (!silent) {
+                            console.log(`📏 已保存视频尺寸: ${testImage.width}×${testImage.height}`);
+                        }
 
                         // 视频尺寸变化时重新计算widget尺寸
                         const previewWidget = this.widgets.find(w => w.type === "crop_preview");
@@ -835,7 +843,9 @@ app.registerExtension({
                             fallbackImage.crossOrigin = 'anonymous';
 
                             fallbackImage.onload = () => {
-                                console.log(`✅ 使用备用预览图片: ${fallbackPath}`);
+                                if (!silent) {
+                                    console.log(`✅ 使用备用预览图片: ${fallbackPath}`);
+                                }
 
                                 // 保存到节点属性
                                 if (fallbackImage.width > 0) {
