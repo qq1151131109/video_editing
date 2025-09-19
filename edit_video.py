@@ -337,29 +337,26 @@ class EnhancedVideoCropNode:
                         frame_path = os.path.join(cache_dir, frame_filename)
 
                         # 检查帧文件是否已存在且比视频文件新
+                        frame_cached = False
                         if os.path.exists(frame_path):
                             video_mtime = os.path.getmtime(video_file)
                             frame_mtime = os.path.getmtime(frame_path)
                             if frame_mtime > video_mtime:
-                                # 缓存有效，直接返回
-                                probe = ffmpeg.probe(video_file)
-                                video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-                                if video_stream:
-                                    width = int(video_stream['width'])
-                                    height = int(video_stream['height'])
-                                    print(f"🎯 使用缓存的预览帧: {frame_path}")
-                                    return frame_path, width, height
+                                # 缓存有效，跳过帧生成
+                                frame_cached = True
+                                print(f"🎯 使用缓存的预览帧: {frame_path}")
                             else:
                                 print(f"🔄 视频文件已更新，重新生成预览帧: {video_file}")
 
-                        # 提取视频帧
-                        (
-                            ffmpeg
-                            .input(video_file, ss=frame_time)
-                            .output(frame_path, vframes=1, format='image2', vcodec='mjpeg')
-                            .overwrite_output()
-                            .run(quiet=True)
-                        )
+                        # 如果没有缓存，提取视频帧
+                        if not frame_cached:
+                            (
+                                ffmpeg
+                                .input(video_file, ss=frame_time)
+                                .output(frame_path, vframes=1, format='image2', vcodec='mjpeg')
+                                .overwrite_output()
+                                .run(quiet=True)
+                            )
 
                         # 获取视频分辨率
                         probe = ffmpeg.probe(video_file)
@@ -367,7 +364,10 @@ class EnhancedVideoCropNode:
                         if video_stream:
                             width = int(video_stream['width'])
                             height = int(video_stream['height'])
-                            print(f"📸 提取视频帧: {frame_path} ({width}×{height})")
+                            if not frame_cached:
+                                print(f"📸 提取视频帧: {frame_path} ({width}×{height})")
+                            else:
+                                print(f"📸 使用缓存帧: {frame_path} ({width}×{height})")
 
                             # 额外生成JavaScript期望的预览图片文件，包含路径哈希避免同名目录冲突
                             input_folder_full_path = EnhancedVideoCropNode.get_input_path(input_folder)
