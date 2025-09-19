@@ -524,9 +524,9 @@ class EnhancedVideoCropNode:
         默认启用预览模式和保留音频
         """
         try:
-            # 内部设置默认值（用户不可见）
-            preview_only = True  # 默认开启预览
-            keep_audio = True    # 默认保留音频
+            # 直接设置为生产模式，不只是预览
+            preview_only = False  # 直接生产模式，不只是预览
+            keep_audio = True     # 默认保留音频
             # 自动探测视频分辨率
             video_width, video_height = self.detect_video_resolution(input_folder)
             print(f"🔍 自动探测视频分辨率: {video_width}×{video_height}")
@@ -652,16 +652,20 @@ class EnhancedVideoCropNode:
 
             if preview_count > 0:
                 result_parts.append(f"生成预览视频: {preview_count} 个")
+            if processed_count > 0:
+                result_parts.append(f"裁切视频: {processed_count} 个")
+
+            # 打印处理结果
+            if result_parts:
+                print(f"✅ 处理完成: {', '.join(result_parts)}")
 
             if preview_only:
                 if preview_count == 0:
                     return (output_path,)  # 即使没有找到文件也返回输出路径
                 return (os.path.join(output_path, 'previews'),)  # 返回预览文件夹路径
 
-            if processed_count == 0:
-                return (output_path,)  # 返回输出路径
-
-            return (output_path,)  # 返回输出文件夹路径
+            # 实际裁切模式：返回主输出文件夹路径
+            return (output_path,)
 
         except Exception as e:
             return (f"处理过程中出错: {str(e)}",)
