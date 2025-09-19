@@ -169,6 +169,15 @@ class EnhancedVideoCropNode:
     支持快速比例选择、自动居中计算和预览图生成
     """
 
+    @staticmethod
+    def get_input_path(input_folder):
+        """获取输入文件夹的完整路径"""
+        input_dir = folder_paths.get_input_directory()
+        if input_folder == "input":
+            return input_dir
+        else:
+            return os.path.join(input_dir, input_folder)
+
 
     @classmethod
     def get_aspect_ratios(cls):
@@ -251,7 +260,7 @@ class EnhancedVideoCropNode:
         自动探测输入文件夹中第一个视频的分辨率
         """
         try:
-            input_path = VideoCropNode.get_input_path(input_folder)
+            input_path = EnhancedVideoCropNode.get_input_path(input_folder)
             if not os.path.exists(input_path):
                 return 1920, 1080  # 默认分辨率
 
@@ -289,7 +298,7 @@ class EnhancedVideoCropNode:
             (frame_path, video_width, video_height) 或 (None, None, None)
         """
         try:
-            input_path = VideoCropNode.get_input_path(input_folder)
+            input_path = EnhancedVideoCropNode.get_input_path(input_folder)
             if not os.path.exists(input_path):
                 return None, None, None
 
@@ -516,7 +525,7 @@ class EnhancedVideoCropNode:
                 print(f"📸 视频预览帧已生成: {frame_path}")
 
                 # 生成5秒预览视频供前端播放
-                input_path = VideoCropNode.get_input_path(input_folder)
+                input_path = EnhancedVideoCropNode.get_input_path(input_folder)
                 for filename in sorted(os.listdir(input_path)):
                     if filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.wmv')):
                         source_video = os.path.join(input_path, filename)
@@ -530,7 +539,7 @@ class EnhancedVideoCropNode:
             else:
                 print("⚠️ 未能提取视频帧")
             # 获取输入输出路径
-            input_folder_path = VideoCropNode.get_input_path(input_folder)
+            input_folder_path = EnhancedVideoCropNode.get_input_path(input_folder)
             if not os.path.exists(input_folder_path):
                 raise ValueError(f"输入文件夹不存在: {input_folder_path}")
 
