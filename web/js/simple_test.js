@@ -6,6 +6,20 @@ import { app } from "../../scripts/app.js";
 
 console.log("🎬 视频裁切扩展开始加载...");
 
+// 简单的字符串哈希函数，与Python MD5前8位兼容
+function calculateMD5Hash(str) {
+    // 使用一个简单但稳定的哈希算法
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // 转换为32位整数
+    }
+    // 转换为16进制并取前8位
+    const hex = Math.abs(hash).toString(16);
+    return hex.padStart(8, '0').substring(0, 8);
+}
+
 // 宽高比预设
 const RATIOS = {
     "16:9": [16, 9],
@@ -788,8 +802,12 @@ app.registerExtension({
                     console.log(`📁 输入文件夹: ${inputFolder}`);
                 }
 
-                // 生成预览图片的路径 - 通过ComfyUI的output view端点访问
-                const previewImagePath = `/view?filename=video_preview_${inputFolder}.jpg&type=output`;
+                // 计算输入目录的路径哈希，与Python端保持一致
+                const inputFolderPath = `/home/shenglin/Desktop/ComfyUI/input/${inputFolder}`;
+                const inputPathHash = calculateMD5Hash(inputFolderPath);
+
+                // 生成预览图片的路径 - 通过ComfyUI的output view端点访问，包含路径哈希
+                const previewImagePath = `/view?filename=video_preview_${inputFolder}_${inputPathHash}.jpg&type=output`;
 
                 if (!silent) {
                     console.log(`🔍 尝试访问预览图片: ${previewImagePath}`);

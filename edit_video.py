@@ -369,8 +369,10 @@ class EnhancedVideoCropNode:
                             height = int(video_stream['height'])
                             print(f"📸 提取视频帧: {frame_path} ({width}×{height})")
 
-                            # 额外生成JavaScript期望的预览图片文件
-                            preview_filename = f"video_preview_{input_folder}.jpg"
+                            # 额外生成JavaScript期望的预览图片文件，包含路径哈希避免同名目录冲突
+                            input_folder_full_path = EnhancedVideoCropNode.get_input_path(input_folder)
+                            input_path_hash = hashlib.md5(input_folder_full_path.encode('utf-8')).hexdigest()[:8]
+                            preview_filename = f"video_preview_{input_folder}_{input_path_hash}.jpg"
                             preview_path_subdir = os.path.join(cache_dir, preview_filename)
                             preview_path_root = os.path.join(output_dir, preview_filename)
 
