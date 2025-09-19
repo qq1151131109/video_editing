@@ -3,7 +3,12 @@
 支持视频裁切、预览等功能
 """
 
-from .edit_video import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from .edit_video import NODE_CLASS_MAPPINGS as CROP_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as CROP_DISPLAY_MAPPINGS
+from .mearge_video import NODE_CLASS_MAPPINGS as MERGE_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as MERGE_DISPLAY_MAPPINGS
+
+# 合并所有节点映射
+NODE_CLASS_MAPPINGS = {**CROP_MAPPINGS, **MERGE_MAPPINGS}
+NODE_DISPLAY_NAME_MAPPINGS = {**CROP_DISPLAY_MAPPINGS, **MERGE_DISPLAY_MAPPINGS}
 
 # 设置Web目录 - ComfyUI会自动加载此目录下的所有.js文件
 WEB_DIRECTORY = "./web/js"
@@ -11,7 +16,7 @@ WEB_DIRECTORY = "./web/js"
 # 版本信息
 __version__ = "1.0.0"
 __author__ = "Shenglin"
-__description__ = "视频编辑工具包：智能视频裁切、预览功能"
+__description__ = "视频编辑工具包：智能视频裁切、视频合并、预览功能"
 
 # 导出必要的变量供ComfyUI加载
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
