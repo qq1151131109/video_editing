@@ -858,44 +858,16 @@ app.registerExtension({
                 testImage.src = previewImagePath;
             };
 
-            // 生成预览图片的函数
+            // 生成预览图片的函数 - 现在只显示提示信息
             nodeType.prototype.generatePreviewImage = function(inputFolder) {
-                console.log(`🎨 开始为文件夹 "${inputFolder}" 生成预览图片...`);
+                console.log(`💡 提示: 预览图片将在执行节点时自动生成 (文件夹: "${inputFolder}")`);
 
-                // 向后端发送请求生成预览图片
-                fetch('/api/generate_video_preview', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        input_folder: inputFolder
-                    })
-                })
-                .then(response => {
-                    if (response.ok) {
-                        return response.json();
-                    }
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                })
-                .then(data => {
-                    console.log("✅ 预览图片生成成功", data);
-
-                    // 等待1秒后重新尝试加载预览
-                    setTimeout(() => {
-                        this.tryLoadPreviewVideo();
-                    }, 1000);
-                })
-                .catch(error => {
-                    console.log("❌ 预览图片生成失败:", error.message);
-
-                    // 显示默认提示
-                    const previewVideoWidget = this.widgets.find(w => w.name === "preview_video");
-                    if (previewVideoWidget) {
-                        previewVideoWidget.value = "";
-                    }
-                    this.setDirtyCanvas(true, true);
-                });
+                // 显示默认提示，不进行API调用
+                const previewVideoWidget = this.widgets.find(w => w.name === "preview_video");
+                if (previewVideoWidget) {
+                    previewVideoWidget.value = "";
+                }
+                this.setDirtyCanvas(true, true);
             };
 
             // 监听input_folder变化
