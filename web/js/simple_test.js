@@ -832,40 +832,9 @@ app.registerExtension({
                         console.log(`❌ 无法访问预览图片: ${previewImagePath}`);
                     }
 
-                    // 首先尝试用现有的预览图片
-                    const existingPreviews = ["test", "input", "video"];
-                    let foundExisting = false;
-
-                    for (const folder of existingPreviews) {
-                        if (folder !== inputFolder) {
-                            const fallbackPath = `/view?filename=video_preview_${folder}.jpg&type=output`;
-                            const fallbackImage = new Image();
-                            fallbackImage.crossOrigin = 'anonymous';
-
-                            fallbackImage.onload = () => {
-                                if (!silent) {
-                                    console.log(`✅ 使用备用预览图片: ${fallbackPath}`);
-                                }
-
-                                // 保存到节点属性
-                                if (fallbackImage.width > 0) {
-                                    this.videoWidth = fallbackImage.width;
-                                    this.videoHeight = fallbackImage.height;
-                                    this.previewImagePath = fallbackPath;
-                                }
-
-                                this.setDirtyCanvas(true, true);
-                                foundExisting = true;
-                            };
-
-                            fallbackImage.src = fallbackPath;
-                            break;
-                        }
-                    }
-
-                    // 如果没有找到现有预览，静默处理（不显示错误信息）
-                    if (!foundExisting && !silent) {
-                        console.log("🔄 尝试生成预览图片...");
+                    // 不使用备用预览图，直接提示用户执行节点生成预览
+                    if (!silent) {
+                        console.log("🔄 预览图片不存在，请执行节点生成预览");
                         this.generatePreviewImage(inputFolder);
                     }
                 };

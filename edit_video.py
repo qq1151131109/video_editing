@@ -332,6 +332,19 @@ class EnhancedVideoCropNode:
                             width = int(video_stream['width'])
                             height = int(video_stream['height'])
                             print(f"📸 提取视频帧: {frame_path} ({width}×{height})")
+
+                            # 额外生成JavaScript期望的预览图片文件
+                            preview_filename = f"video_preview_{input_folder}.jpg"
+                            preview_path = os.path.join(output_dir, preview_filename)
+
+                            try:
+                                # 复制帧文件到预览位置
+                                import shutil
+                                shutil.copy2(frame_path, preview_path)
+                                print(f"📸 预览图片已生成: {preview_path}")
+                            except Exception as e:
+                                print(f"⚠️ 生成预览图片失败: {e}")
+
                             return frame_path, width, height
 
                     except Exception as e:
